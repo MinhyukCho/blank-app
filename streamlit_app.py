@@ -36,25 +36,61 @@ if url:
     st.code(generated_prompt, language="markdown")
 
     # 5. [핵심 기능] 복사 버튼 + st.toast 연동
-    # SyntaxError 방지를 위해 자바스크립트용 문자열 처리를 f-string 밖에서 수행
-    safe_prompt = generated_prompt.replace("`", "\\`").replace("$", "\\$")
-    
-    if st.button("📋 프롬프트 복사하고 알림 받기", use_container_width=True):
-        # f-string 내부가 아닌 외부에서 처리된 safe_prompt를 사용
-        js_code = f"""
-            <script>
-                const text = `{safe_prompt}`;
-                navigator.clipboard.writeText(text).then(() => {{
-                    console.log('Copy successful');
-                }});
-            </script>
-        """
-        # 보이지 않는 컴포넌트로 JS 실행
-        components.html(js_code, height=0)
-        
-        # 스트림릿 전용 토스트 알림 표시
-        st.toast("프롬프트가 클립보드에 복사되었습니다!", icon="✅")
+  import streamlit.components.v1 as components
+import json
 
+# ... 기존 프롬프트 생성 코드 이후 ...
+
+if url:
+    generated_prompt = f"생성된 프롬프트 내용..." # 실제 변수명에 맞게 수정
+    
+    # 자바스크립트용 문자열 안전 처리
+    safe_prompt = json.dumps(generated_prompt)
+
+    # 버튼과 복사 로직을 하나의 HTML로 통합 (보안 제약 우회)
+    copy_html = f"""
+        <div id="copy-container">
+            <button id="copy-btn" style="
+                width: 100%;
+                background-color: #FF4B4B;
+                color: white;
+                border: none;
+                padding: 12px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-weight: bold;
+                font-size: 16px;
+                margin-top: 10px;
+            ">
+                📋 프롬프트 복사하기
+            </button>
+        </div>
+
+        <script>
+        document.getElementById('copy-btn').addEventListener('click', function() {{
+            const text = {safe_prompt};
+            
+            // 임시 텍스트 영역을 통한 확실한 복사 방식
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            
+            try {{
+                document.execCommand('copy');
+                // 부모 창(Streamlit)에 알림을 보내기 위한 설정
+                window.parent.postMessage({{type: 'copy-done'}}, '*');
+                alert('클립보드에 복사되었습니다!');
+            }} catch (err) {{
+                console.error('복사 실패:', err);
+            }}
+            document.body.removeChild(textArea);
+        }});
+        </script>
+    """
+    
+    # HTML 컴포넌트 실행 (버튼 표시)
+    components.html(copy_html, height=70)
 else:
     st.info("URL을 입력하면 프롬프트가 자동으로 생성됩니다.")
 
